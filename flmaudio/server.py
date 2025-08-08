@@ -62,6 +62,7 @@ class ServerState:
         self.lm_gen.streaming_forever(1)
 
         self.settings = {}
+        self.t_s = time.time()
 
     def warmup(self):
         for chunk in range(4):
@@ -141,6 +142,7 @@ class ServerState:
                     all_pcm_data = all_pcm_data[self.frame_size :]
                     await decode_step(chunk)
                     log("info", f"frame handled in {1000 * (time.time() - be):.1f}ms")
+                    log("info", f"iteratino cost {1000 * (time.time() - self.t_s):.1f}ms"); self.t_s = time.time()
 
         async def decode_step(chunk):
             nonlocal text_streamer
