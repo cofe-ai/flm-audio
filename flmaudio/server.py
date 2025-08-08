@@ -152,7 +152,6 @@ class ServerState:
 
             codes = self.mimi.encode(chunk)
             log("info", f"[infer]mimi_encode: {1000 * (time.time() - t_s):.1f}ms"); t_s = time.time()
-            log("info", f"{codes.shape=}")
             for c in range(codes.shape[-1]):
                 tokens = self.lm_gen.step(codes[:, :, c : c + 1])
                 log("info", f"[infer]lm_step: {1000 * (time.time() - t_s):.1f}ms"); t_s = time.time()
