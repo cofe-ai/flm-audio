@@ -142,20 +142,25 @@ class ServerState:
                     all_pcm_data = all_pcm_data[self.frame_size :]
                     await decode_step(chunk)
                     log("info", f"frame handled in {1000 * (time.time() - be):.1f}ms")
-                    log("info", f"overhead cost {1000 * (be - self.t_s):.1f}ms"); self.t_s = time.time()
+                    # log("info", f"overhead cost {1000 * (be - self.t_s):.1f}ms"); self.t_s = time.time()
 
         async def decode_step(chunk):
+            t_s = time.time()
             nonlocal text_streamer
             chunk = torch.from_numpy(chunk).to(torch.float32)
             chunk = chunk.to(device=self.device)[None, None]
 
             codes = self.mimi.encode(chunk)
+            log("info", f"[infer]mimi_encode: {1000 * (time.time() - t_s):.1f}ms"); t_s = time.time()
+            log("info", f"{codes.shape=}")
             for c in range(codes.shape[-1]):
                 tokens = self.lm_gen.step(codes[:, :, c : c + 1])
+                log("info", f"[infer]lm_step: {1000 * (time.time() - t_s):.1f}ms"); t_s = time.time()
                 if tokens is None:
                     continue
                 assert tokens.shape[1] == 9  # self.lm_gen.lm_model.dep_q + 1
                 main_pcm = self.mimi.decode(tokens[:, 1:])
+                log("info", f"[infer]mimi_decode: {1000 * (time.time() - t_s):.1f}ms"); t_s = time.time()
                 main_pcm = main_pcm.cpu()
                 output_pcm = main_pcm[0, 0].numpy()
                 opus_writer.append_pcm(output_pcm)
@@ -169,6 +174,7 @@ class ServerState:
                         if text_streamer:
                             text_streamer.end()
                             text_streamer = None
+                log("info", f"[infer]write_output: {1000 * (time.time() - t_s):.1f}ms"); t_s = time.time()
 
         async def audio_loop():
             while not close:
