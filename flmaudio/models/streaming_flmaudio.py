@@ -5,6 +5,7 @@
 from dataclasses import dataclass
 from typing import List, Callable
 import torch
+import time
 from transformers.cache_utils import DynamicCache
 from ..third_party.moshi.utils.sampling import sample_token
 from ..third_party.moshi.modules.streaming import StreamingModule
@@ -67,6 +68,11 @@ class LMGen(StreamingModule[_LMGenState]):
         self.delays_cuda = torch.tensor(
             self.delays, device=lm_model.device, dtype=torch.long
         )
+
+        log("info", f"torch.compile begin")
+        t_s = time.time()
+        self.step = torch.compile(self.step)
+        log("info", f"torch.compile done: {time.time() - t_s:.1f}s")
 
     def _init_streaming_state(self, batch_size: int) -> _LMGenState:
         lm_model = self.lm_model
