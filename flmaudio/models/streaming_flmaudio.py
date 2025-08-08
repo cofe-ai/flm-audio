@@ -130,7 +130,7 @@ class LMGen(StreamingModule[_LMGenState]):
 
         t_s = time.time()
         lm_outputs = state.forward_text(**model_input)
-        log("info", f"lm.forward_text: {time.time() - t_s:.1f}s"); t_s = time.time()
+        log("info", f"lm.forward_text: {1000 * (time.time() - t_s):.1f}ms"); t_s = time.time()
         state.past_key_values = lm_outputs.past_key_values
         last_text_token_logits = lm_outputs.logits[:, -1:, :]
         last_hidden_states = lm_outputs.hidden_states[:, -1, :]
@@ -147,7 +147,7 @@ class LMGen(StreamingModule[_LMGenState]):
             repetition_penalty=self.repetition_penalty_text if rep_window_input_ids is not None else 1.0,
             input_ids=rep_window_input_ids,
         )
-        log("info", f"sample_text: {time.time() - t_s:.1f}s"); t_s = time.time()
+        log("info", f"sample_text: {1000 * (time.time() - t_s):.1f}ms"); t_s = time.time()
 
         state.text_tokens_cache.append(sampled_text_token)
         if len(state.text_tokens_cache) > self.repetition_penalty_window_text:
@@ -156,7 +156,7 @@ class LMGen(StreamingModule[_LMGenState]):
         sampled_text_token = sampled_text_token[0]  # shape is [B]
 
         audio_tokens = state.depformer_step(last_hidden_states)
-        log("info", f"depformer_step: {time.time() - t_s:.1f}s"); t_s = time.time()
+        log("info", f"depformer_step: {1000 * (time.time() - t_s):.1f}ms"); t_s = time.time()
 
         state.offset += 1
         position = state.offset % CT
