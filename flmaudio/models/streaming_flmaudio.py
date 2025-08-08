@@ -8,7 +8,7 @@ import torch
 from transformers.cache_utils import DynamicCache
 from ..third_party.moshi.utils.sampling import sample_token
 from ..third_party.moshi.modules.streaming import StreamingModule
-
+from ..utils import log
 
 @dataclass
 class _LMGenState:
@@ -119,6 +119,8 @@ class LMGen(StreamingModule[_LMGenState]):
             'past_key_values': state.past_key_values,
             'use_cache': True,
         }
+        if state.past_key_values is not None and len(state.past_key_values) > 0:
+            log("info", f"kv cahce: [{len(state.past_key_values)},{len(state.past_key_values[0])}] {state.past_key_values[0][0].shape}")
 
         lm_outputs = state.forward_text(**model_input)
         state.past_key_values = lm_outputs.past_key_values
@@ -180,7 +182,7 @@ class LMGen(StreamingModule[_LMGenState]):
             audio_logits = self.lm_model.forward_audio(
                 transformer_output_states=last_hidden_states,
                 audio_input_ids=decoded_audio_tokens
-            ) # [B, K, vocab_size+1]
+            ) # [B, K, vocab_size+1]: logis
             current_aud_logit = audio_logits[:, -1:, :]
 
             sampled_audio_token = sample_token(
