@@ -86,6 +86,7 @@ class LMGen(StreamingModule[_LMGenState]):
         past_key_values = DynamicCache()
 
         lm_model.forward = torch.compile(lm_model.forward)
+        lm_model.forward_audio = torch.compile(lm_model.forward)
 
         return _LMGenState(cache, initial, lm_model.forward, self.depformer_step, past_key_values, offset=0, audio_speak_tokens_cache=[], text_tokens_cache=[])
 
