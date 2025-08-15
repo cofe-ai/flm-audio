@@ -5,10 +5,11 @@
 from dataclasses import dataclass
 from typing import List, Callable
 import torch
+import time
 from transformers.cache_utils import DynamicCache
 from ..third_party.moshi.utils.sampling import sample_token
 from ..third_party.moshi.modules.streaming import StreamingModule
-
+from ..utils import log
 
 @dataclass
 class _LMGenState:
@@ -69,6 +70,7 @@ class LMGen(StreamingModule[_LMGenState]):
         )
 
     def _init_streaming_state(self, batch_size: int) -> _LMGenState:
+        log("info", f"in _init_streaming_state")
         lm_model = self.lm_model
         initial = lm_model._get_initial_token()
         cache = torch.full(
@@ -78,6 +80,14 @@ class LMGen(StreamingModule[_LMGenState]):
             dtype=torch.long,
         )
         past_key_values = DynamicCache()
+
+        lm_model.forward = torch.compile(lm_model.forward)
+        lm_model.forward_audio = torch.compile(lm_model.forward_audio)
+
+        log("info", f"torch.compile begin")
+        t_s = time.time()
+        # self.step = torch.compile(self.step)
+        log("info", f"torch.compile done: {time.time() - t_s:.1f}s")
 
         return _LMGenState(cache, initial, lm_model.forward, self.depformer_step, past_key_values, offset=0, audio_speak_tokens_cache=[], text_tokens_cache=[])
 
@@ -119,8 +129,12 @@ class LMGen(StreamingModule[_LMGenState]):
             'past_key_values': state.past_key_values,
             'use_cache': True,
         }
+        if False and state.past_key_values is not None and len(state.past_key_values) > 0:
+            log("info", f"kv cahce: [{len(state.past_key_values)},{len(state.past_key_values[0])}] {state.past_key_values[0][0].shape}")
 
+        t_s = time.time()
         lm_outputs = state.forward_text(**model_input)
+        # log("info", f"lm.forward_text: {1000 * (time.time() - t_s):.1f}ms"); t_s = time.time()
         state.past_key_values = lm_outputs.past_key_values
         last_text_token_logits = lm_outputs.logits[:, -1:, :]
         last_hidden_states = lm_outputs.hidden_states[:, -1, :]
@@ -137,6 +151,7 @@ class LMGen(StreamingModule[_LMGenState]):
             repetition_penalty=self.repetition_penalty_text if rep_window_input_ids is not None else 1.0,
             input_ids=rep_window_input_ids,
         )
+        # log("info", f"sample_text: {1000 * (time.time() - t_s):.1f}ms"); t_s = time.time()
 
         state.text_tokens_cache.append(sampled_text_token)
         if len(state.text_tokens_cache) > self.repetition_penalty_window_text:
@@ -145,6 +160,7 @@ class LMGen(StreamingModule[_LMGenState]):
         sampled_text_token = sampled_text_token[0]  # shape is [B]
 
         audio_tokens = state.depformer_step(last_hidden_states)
+        # log("info", f"depformer_step: {1000 * (time.time() - t_s):.1f}ms"); t_s = time.time()
 
         state.offset += 1
         position = state.offset % CT
@@ -177,10 +193,13 @@ class LMGen(StreamingModule[_LMGenState]):
         else:
             rep_window_input_ids = torch.concat(state.audio_speak_tokens_cache, dim=0).unsqueeze(0).permute(0, 2, 1).to(dtype=torch.long, device=last_hidden_states.device)
         for i in range(self.lm_model.config.aud_channel):
+            t_s = time.time()
             audio_logits = self.lm_model.forward_audio(
                 transformer_output_states=last_hidden_states,
                 audio_input_ids=decoded_audio_tokens
-            ) # [B, K, vocab_size+1]
+            ) # [B, K, vocab_size+1]: logis
+            # if i == 0:
+                # log("info", f"forward_audio[{i}]: {1000 * (time.time() - t_s):.1f}ms"); t_s = time.time()
             current_aud_logit = audio_logits[:, -1:, :]
 
             sampled_audio_token = sample_token(
@@ -193,6 +212,8 @@ class LMGen(StreamingModule[_LMGenState]):
                 input_ids=rep_window_input_ids[:, i] if rep_window_input_ids is not None else None
                 ).unsqueeze(1)   # [B, 1, 1(k)]   ->[B, 1(k)]
             decoded_audio_tokens = torch.concat([decoded_audio_tokens, sampled_audio_token], dim=1)   # [B, 0] [B, 1(k)]
+            # if i == 0:
+                # log("info", f"sample_audio[{i}]: {1000 * (time.time() - t_s):.1f}ms"); t_s = time.time()
 
         state.audio_speak_tokens_cache.append(decoded_audio_tokens)
 

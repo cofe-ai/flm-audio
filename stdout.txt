@@ -1,0 +1,25 @@
+[1;34m[Info][0m loading mimi
+[1;34m[Info][0m mimi loaded
+[1;34m[Info][0m loading model
+number of parameters: 490.69M
+[1;34m[Info][0m model loaded
+[1;34m[Info][0m torch.compile begin
+[1;34m[Info][0m torch.compile done: 0.8s
+[1;34m[Info][0m warming up the model
+[1;34m[Info][0m Access the API directly at http://0.0.0.0:8990/api/chat
+======== Running on http://0.0.0.0:8990 ========
+(Press CTRL+C to quit)
+[1;34m[Info][0m accepted connection
+[1;34m[Info][0m frame handled in 51.1ms
+[1;34m[Info][0m frame handled in 35.9ms
+[1;34m[Info][0m frame handled in 50.8ms
+[1;34m[Info][0m frame handled in 66.9ms
+[1;34m[Info][0m frame handled in 9771.1ms
+[1;34m[Info][0m frame handled in 9003.0ms
+[1;34m[Info][0m frame handled in 44007.5ms
+[1;34m[Info][0m connection closed
+[1;34m[Info][0m frame handled in 73921.7ms
+[1;34m[Info][0m done with connection
+[1;34m[Info][0m accepted connection
+[1;34m[Info][0m accepted connection
+[1;34m[Info][0m connection closed
