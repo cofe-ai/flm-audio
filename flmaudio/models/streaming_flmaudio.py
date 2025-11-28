@@ -2,8 +2,8 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-from dataclasses import dataclass
-from typing import List, Callable
+from dataclasses import dataclass, field
+from typing import Callable
 import torch
 from transformers.cache_utils import DynamicCache
 from ..third_party.moshi.utils.sampling import sample_token
@@ -13,14 +13,15 @@ from ..third_party.moshi.modules.streaming import StreamingModule
 @dataclass
 class _LMGenState:
     cache: torch.Tensor
-    initial: torch.Tensor
     forward_text: Callable
     depformer_step: Callable
-    past_key_values: DynamicCache
-    offset: int
-    text_tokens_cache: List
-    audio_speak_tokens_cache: List
+    past_key_values: DynamicCache = field(default_factory=DynamicCache)
+    offset: int = 0
+    text_tokens_cache: list = field(default_factory=list)
+    audio_speak_tokens_cache: list = field(default_factory=list)
+
     def reset(self):
+        self.cache.zero_()
         self.offset = 0
         self.past_key_values = DynamicCache()
         self.audio_speak_tokens_cache = []
@@ -31,7 +32,6 @@ class LMGen(StreamingModule[_LMGenState]):
     def __init__(
         self,
         lm_model,
-        text_tokenizer,
         use_sampling: bool = True,
         temp_audio: float = 0.5,
         temp_text: float = 0.01,
@@ -47,7 +47,6 @@ class LMGen(StreamingModule[_LMGenState]):
         super().__init__()
 
         self.lm_model = lm_model
-        self.text_tokenizer = text_tokenizer
 
         self.use_sampling = use_sampling
         self.temp_audio = temp_audio
@@ -70,19 +69,18 @@ class LMGen(StreamingModule[_LMGenState]):
 
     def _init_streaming_state(self, batch_size: int) -> _LMGenState:
         lm_model = self.lm_model
-        initial = lm_model._get_initial_token()
         cache = torch.full(
             (batch_size, 17, self.max_delay + 20),
             0,
             device=lm_model.device,
             dtype=torch.long,
         )
-        past_key_values = DynamicCache()
+        cache[:, :, 0:1] = lm_model._get_initial_token()
 
         lm_model.forward = torch.compile(lm_model.forward)
         lm_model.forward_audio = torch.compile(lm_model.forward_audio)
 
-        return _LMGenState(cache, initial, lm_model.forward, self.depformer_step, past_key_values, offset=0, audio_speak_tokens_cache=[], text_tokens_cache=[])
+        return _LMGenState(cache, lm_model.forward, self.depformer_step)
 
     @torch.no_grad()
     def step(self, input_tokens: torch.Tensor) -> torch.Tensor | None:
@@ -110,9 +108,6 @@ class LMGen(StreamingModule[_LMGenState]):
             state.cache[:, k, write_position : write_position + 1] = input_tokens[:, q_other]
 
         position = state.offset % CT
-        for k, delay in enumerate(self.delays):
-            if state.offset == 0 and k <= 8 or state.offset < delay and k > 8:
-                state.cache[:, k, position] = state.initial[:, k, 0]
         input_ = state.cache[:, :, position : position + 1]
         input_ = input_.permute(0, 2, 1).contiguous()
         model_input = {
