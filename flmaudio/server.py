@@ -4,7 +4,6 @@
 
 import argparse
 import asyncio
-from dataclasses import dataclass
 import json
 import random
 from pathlib import Path
@@ -33,23 +32,17 @@ def seed_all(seed):
     torch.backends.cudnn.benchmark = False
 
 
-@dataclass
 class ServerState:
-    mimi: MimiModel
-    text_tokenizer: AutoTokenizer
-    lm_gen: LMGen
-    lock: asyncio.Lock
-
     def __init__(
         self,
         mimi: MimiModel,
-        text_tokenizer: AutoTokenizer,
+        tokenizer: AutoTokenizer,
         lm: FLMAudioForCausalLM,
         device: str | torch.device,
     ):
         self.mimi = mimi
-        self.text_tokenizer = text_tokenizer
-        self.lm_gen = LMGen(lm, text_tokenizer)
+        self.tokenizer = tokenizer
+        self.lm_gen = LMGen(lm)
 
         self.device = device
         self.frame_size = int(
@@ -161,7 +154,7 @@ class ServerState:
                 if text_token not in (0, 3):
                     if text_token != self.lm_gen.lm_model.config.mm_token_info.text_wait_token_id:
                         if not text_streamer:
-                            text_streamer = AsyncTextIteratorStreamer(self.text_tokenizer)
+                            text_streamer = AsyncTextIteratorStreamer(self.tokenizer)
                         text_streamer.put(torch.tensor([text_token]))
                     else:
                         if text_streamer:
@@ -271,11 +264,11 @@ def main():
         torch_dtype=torch.bfloat16,
         low_cpu_mem_usage=True,
     )
-    text_tokenizer = AutoTokenizer.from_pretrained(ckpt_path)
+    tokenizer = AutoTokenizer.from_pretrained(ckpt_path)
 
     log("info", "model loaded")
 
-    state = ServerState(mimi, text_tokenizer, lm, args.device)
+    state = ServerState(mimi, tokenizer, lm, args.device)
     log("info", "warming up the model")
     state.warmup()
     app = web.Application()
