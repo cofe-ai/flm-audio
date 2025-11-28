@@ -15,10 +15,10 @@ from aiohttp import web
 import numpy as np
 import sphn
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer
 from transformers.generation.streamers import AsyncTextIteratorStreamer
 
-from .models import loaders, MimiModel, LMGen
+from .models import loaders, MimiModel, LMGen, FLMAudioForCausalLM
 from .utils import log
 
 
@@ -44,7 +44,7 @@ class ServerState:
         self,
         mimi: MimiModel,
         text_tokenizer: AutoTokenizer,
-        lm: AutoModelForCausalLM,
+        lm: FLMAudioForCausalLM,
         device: str | torch.device,
     ):
         self.mimi = mimi
@@ -265,14 +265,13 @@ def main():
 
     log("info", "loading model")
     ckpt_path = args.model_path
-    lm = AutoModelForCausalLM.from_pretrained(
+    lm = FLMAudioForCausalLM.from_pretrained(
         ckpt_path,
-        trust_remote_code=True,
         device_map=args.device,
         torch_dtype=torch.bfloat16,
         low_cpu_mem_usage=True,
     )
-    text_tokenizer = AutoTokenizer.from_pretrained(ckpt_path, trust_remote_code=True)
+    text_tokenizer = AutoTokenizer.from_pretrained(ckpt_path)
 
     log("info", "model loaded")
 
