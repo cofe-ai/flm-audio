@@ -32,6 +32,7 @@ class LMGen(StreamingModule[_LMGenState]):
     def __init__(
         self,
         lm_model,
+        *,
         use_sampling: bool = True,
         temp_audio: float = 0.5,
         temp_text: float = 0.01,
