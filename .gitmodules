@@ -1,0 +1,9 @@
+[submodule "deps/AutoAWQ"]
+	path = deps/AutoAWQ
+	url = https://github.com/casper-hansen/AutoAWQ
+[submodule "deps/AutoAWQ_kernels"]
+	path = deps/AutoAWQ_kernels
+	url = https://github.com/casper-hansen/AutoAWQ_kernels
+[submodule "deps/AutoGPTQ"]
+	path = deps/AutoGPTQ
+	url = https://github.com/AutoGPTQ/AutoGPTQ

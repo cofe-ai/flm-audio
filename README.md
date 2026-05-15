@@ -1,158 +1,104 @@
-<p align="left">
-    &nbsp<a href="README_CN.md">中文</a>&nbsp ｜ English</a>&nbsp
-</p>
-<br><br>
+# FLM-Audio（量化AWQ/GPTQ版本）推理运行说明
 
-# FLM-Audio
+本指南提供运行FLM-Audio量化版本（AWQ/GPTQ）的详细步骤。
 
-<p align="center">
-        🤗 <a href="https://huggingface.co/CofeAI">Hugging Face</a>&nbsp&nbsp | &nbsp&nbsp🤖 <a href="https://modelscope.cn/organization/FLM">ModelScope</a>&nbsp&nbsp | &nbsp&nbsp 📑 <a href="https://arxiv.org/abs/2509.02521">Paper</a> &nbsp&nbsp ｜ &nbsp&nbsp🖥️ <a href="https://flm-audio.cofeai.cn/">Demo</a>
-</p>
+---
 
-FLM-Audio is a audio-language subversion of [RoboEgo/FLM-Ego](https://arxiv.org/abs/2506.01934v1) -- an omnimodal model with native full duplexity. It simultaneously listens, speaks, and composes internal monologue, delivering low‑latency, duplex conversational responses in both English and Chinese. FLM‑Audio is robust to noise and user interruptions, prioritizing responsiveness and naturalness.
+## 环境配置（量化模型支持）
+以下步骤配置支持AWQ和GPTQ量化的服务器环境：
 
-## Model Card
-
-- **Language(s):** Chinese; English;
-
-## Technical Report
-Motivation & Survey: [Toward Embodied AGI: A Review of Embodied AI and the Road Ahead](https://arxiv.org/abs/2505.14235)
-
-FLM-Audio Research Paper: [FLM-Audio: Natural Monologues Improves Native Full-Duplex Chatbots via Dual Training](https://arxiv.org/abs/2509.02521)
-
-Omnimodal System Card: [RoboEgo System Card: An Omnimodal Model with Native Full Duplexity](https://arxiv.org/abs/2506.01934v1)
-
-## Online Demo
-
-We provide a simple interactive demo example: [flm-audio-Demo](https://flm-audio.cofeai.cn/), [Backup Demo](https://flm-audio.cofenet.cn/)
-The current model already supports **streaming input and output**. Users can interact with **FLM-Audio** through direct voice conversations, and the model will return streaming speech responses.
-
-**Notes**:
-- We recommend asking history-related questions, such as *“介绍下中国的历史 (Introduce the history of China)”* or *“介绍下唐太宗李世民 (Tell me about Emperor Taizong of Tang, Li Shimin.)”*
-- Server resources are currently limited. If you see the message `Too many concurrent connections. Please try again later!`, please try again later.
-- Since streaming speech transmission requires low latency, you may get a better experience in a stable and high-quality network environment.
-- Since streaming speech transmission requires low latency, you may get a better experience in a stable and high-quality network environment.
-
-
-## Bias, Risks, and Limitations
-
-Despite extensive data cleaning, FLM‑Audio may still produce undesired content (e.g., biased or offensive language). Users should not disseminate unsafe outputs. Project authors are not responsible for misuse or harmful consequences.
-
-
-## Quick Start
-
-### Recommended: Run the Server via Docker (Production/Deployment)
-
-We recommend using the official Docker images published under the `cofe-ai` organization on GitHub Container Registry:
-
-> `ghcr.io/cofe-ai/flm-audio`
-
-Image variants:
-
-- `ghcr.io/cofe-ai/flm-audio:server-1.0.0-model-v202507` — **includes the pre‑downloaded model** (ideal for offline or fast startup environments).
-- `ghcr.io/cofe-ai/flm-audio:server-1.0.0` — **downloads the model from Hugging Face at runtime** (requires internet access).
-
-Example startup commands:
-
+### 1. 安装`uv`包管理器
+`uv`是快速Python包管理器，用于环境和依赖管理：
 ```bash
-# Using the image with pre-downloaded model (recommended for offline/fast startup)
-docker run -dit --gpus '"device=1"' -p 8990:8990 --restart always --name flm-audio-server ghcr.io/cofe-ai/flm-audio:server-1.0.0-model-v202507
-
-# Or: using the image that downloads the model at runtime (requires network access)
-docker run -dit --gpus '"device=1"' -p 8990:8990 --restart always --name flm-audio-server ghcr.io/cofe-ai/flm-audio:server-1.0.0
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
-
-**Notes / Tips:**
-- `--gpus '"device=1"'`: the example binds GPU device `1`. Adjust as needed (e.g., `--gpus all` or `--gpus '"device=0,1"'`).
-- Port `8990` is the default server port; adjust host mapping if necessary with `-p HOST_PORT:8990`.
-- For private images, you may need to `docker login ghcr.io` with a GitHub personal access token (PAT).
-- When using the non-preloaded image (`server-1.0.0`), the container will download the model on first startup. Download time depends on your network.
-
-Please note: on first container startup, this model will perform a short compilation phase to speed up inference (approximately 2 minutes depending on server performance). The server is fully started when you see logs similar to:
-```
-[Info] model loaded
-[Info] warming up the model
-[Info] Access the API directly at http://0.0.0.0:8990/api/chat
-======== Running on http://0.0.0.0:8990 ========
-(Press CTRL+C to quit)
-```
-
-### Local Development (Optional)
-
+验证安装：
 ```bash
-# install dependencies
-pip install -r requirements-server.txt
-python -m flmaudio.server --port 8990
+uv --version
 ```
 
-### Start the Web UI
-
+### 2. 克隆`flm-audio`仓库
 ```bash
-# install dependencies
-pip install -r requirements-clientgui.txt
-python -m flmaudio.client_gradio --url http://localhost:8990
+git clone -b quantized https://github.com/cofe-ai/flm-audio.git
+cd flm-audio
+git submodule update --init --recursive
 ```
 
-Then you can open http://localhost:50000 in your browser to try the demo.
-
-### Start the CLI
-
+### 3. 创建Python 3.12虚拟环境
 ```bash
-# install dependencies
-pip install -r requirements-clientcli.txt
-python -m flmaudio.client --url http://localhost:8990
+uv venv -p 3.12
+```
+将创建包含Python 3.12的`.venv`目录，可选择性激活（uv会自动检测虚拟环境）：
+```bash
+source .venv/bin/activate  # Linux/macOS
 ```
 
-**Notes / Tips:**
-- For both the Web UI and CLI, replace the --url value with your server’s IP and port, and ensure any firewalls allow access.
-- For Web UI debugging, because of Gradio and modern browser security, it is recommended to run the Python command on the same machine as the browser so you can use localhost in the browser.
-
-## Recommended Environment
-
-- **OS:** Linux (preferred for production).
-- **GPU:** NVIDIA GPU with **at least 20 GB VRAM** recommended for larger models and stable inference.
-- **Software:** Docker, NVIDIA Container Toolkit (`nvidia-docker`/`--gpus` support), and appropriate NVIDIA driver.
-- **Storage:** Ensure sufficient disk space for models and logs (model files can require ~16GB).
-- **Network:** Required only if using the image without pre-downloaded model; the preloaded image does not need internet to start.
-
-## FAQ (Brief)
-
-- **Which image should I choose?**
-  - If your server can access the internet and you don’t mind first-run download: use `server-1.0.0`.
-  - If your server cannot access the internet or you prefer fast startup: use `server-1.0.0-model-v202507`.
-
-- **How to specify different GPUs?**
-  - Adjust the `--gpus` parameter, e.g., `--gpus '"device=0"'` or `--gpus all`, depending on your host configuration.
-
-## Acknowledgements
-
-This work is supported by the National Science and Technology Major Project (No. 2022ZD0116314).
-
-
-## Citation
-
-If you find our work helpful, please consider citing the following papers.
-
-```
-@article{flm-audio,
-  title={Flm-audio: Natural monologues improves native full-duplex chatbots via dual training},
-  author={Yao, Yiqun and Li, Xiang and Jiang, Xin and Fang, Xuezhi and Yu, Naitong and Wenjia, Ma and Sun, Aixin and Wang, Yequan},
-  journal={arXiv preprint arXiv:2509.02521},
-  year={2025}
-}
-@article{embodied-agi,
-  title={Toward embodied agi: A review of embodied ai and the road ahead},
-  author={Wang, Yequan and Sun, Aixin},
-  journal={arXiv preprint arXiv:2505.14235},
-  year={2025}
-}
-@article{roboego,
-  title={RoboEgo System Card: An Omnimodal Model with Native Full Duplexity},
-  author={Yao, Yiqun and Li, Xiang and Jiang, Xin and Fang, Xuezhi and Yu, Naitong and Sun, Aixin and Wang, Yequan},
-  journal={arXiv preprint arXiv:2506.01934},
-  year={2025}
-}
+### 4. 安装PyTorch 2.5.1（CUDA 12.1）
+安装支持CUDA 12.1的PyTorch版本，用于GPU推理：
+```bash
+uv pip install torch==2.5.1 --torch-backend=cu121
 ```
 
-## License
-FLM-Audio is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0), except for python code under `third_party/moshi`, which is licensed under the [MIT License](https://opensource.org/license/mit/). The default voice timbre copyright for FLM-Audio is retained by the original voice owner. This project is intended for research use only in compliance with applicable laws. For commercial use, please contact us.
+### 5. 安装服务器依赖
+从requirements文件安装核心服务器依赖：
+```bash
+uv pip install -r requirements-server.txt
+```
+
+### 6. 安装AutoAWQ（AWQ量化必选）
+安装本地预下载的AutoAWQ包，支持AWQ量化：
+```bash
+uv pip install deps/AutoAWQ --no-build-isolation
+```
+
+### 7. 安装AutoAWQ Kernels（AWQ GEMV量化必选）
+安装AutoAWQ推理所需的内核：
+```bash
+uv pip install deps/AutoAWQ_kernels --no-build-isolation
+```
+
+### 8. 安装AutoGPTQ（GPTQ量化必选）
+安装本地预下载的AutoGPTQ包，支持GPTQ量化：
+```bash
+export MAX_JOBS=4
+export TORCH_CUDA_ARCH_LIST="8.0;8.6;9.0"
+uv pip install deps/AutoGPTQ --no-build-isolation
+```
+
+---
+
+## 启动服务器
+所有依赖安装完成后，启动FLM-Audio服务器：
+```bash
+python -m flmaudio.server --port 8990 --model-path /path/to/quantized/model
+```
+服务器将加载量化模型，默认监听8990端口。
+
+---
+
+## 运行客户端
+提供两种客户端：基于Gradio的Web界面和CLI客户端，均连接到运行中的服务器（默认`http://localhost:8990`）。
+
+### Web界面（Gradio）
+1. 安装客户端依赖：
+   ```bash
+   uv pip install -r requirements-clientgui.txt
+   ```
+2. 启动Web界面：
+   ```bash
+   python -m flmaudio.client_gradio --url http://localhost:8990
+   ```
+   在浏览器中访问（默认为`http://localhost:50000`）。
+
+### CLI客户端
+1. 安装CLI依赖：
+   ```bash
+   uv pip install -r requirements-clientcli.txt
+   ```
+2. 启动CLI客户端：
+   ```bash
+   python -m flmaudio.client --url http://localhost:8990
+   ```
+
+## 许可证
+FLM-Audio采用[Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)许可，但`third_party/moshi`下的Python代码采用[MIT License](https://opensource.org/license/mit/)。本项目仅用于研究，需遵守适用法律。商业使用请联系我们。
